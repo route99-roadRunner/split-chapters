@@ -3,7 +3,8 @@
 TXT 파일을 회차별로 분할하는 스크립트
 
 사용법:
-    python split_chapters.py novel.txt
+    python split_chapters.py                    # 대화형 메뉴
+    python split_chapters.py novel.txt          # CLI 모드
     python split_chapters.py novel.txt --group-size 10
     python split_chapters.py novel.txt --preset korean_hanja
     python split_chapters.py novel.txt --pattern "===\\s*\\d+화\\s*==="
@@ -11,7 +12,9 @@ TXT 파일을 회차별로 분할하는 스크립트
 
 import re
 import argparse
+import sys
 from pathlib import Path
+from tkinter import Tk, filedialog
 
 
 # 프리셋 패턴 정의
@@ -22,6 +25,15 @@ PRESETS = {
     "chapter_num": r"[Cc]h\.?\s*\d+",     # Ch.1, ch 5
     "episode": r"[Ee]p\.?\s*\d+",         # Ep.1, EP 10
     "part": r"[Pp]art\s*\d+",             # Part 1, PART 5
+}
+
+PRESET_DESCRIPTIONS = {
+    "korean": "# 제1장, 제12장 (한글)",
+    "korean_hanja": "第1章, 第100章 (한자)",
+    "chapter_en": "Chapter 1, chapter 001 (영문)",
+    "chapter_num": "Ch.1, ch 5 (축약)",
+    "episode": "Ep.1, EP 10 (에피소드)",
+    "part": "Part 1, PART 5 (파트)",
 }
 
 
@@ -125,7 +137,157 @@ def save_groups(
     return saved_files
 
 
-def main():
+def select_file() -> Path | None:
+    """파일 선택 다이얼로그"""
+    root = Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+
+    file_path = filedialog.askopenfilename(
+        title="분할할 TXT 파일 선택",
+        filetypes=[("텍스트 파일", "*.txt"), ("모든 파일", "*.*")]
+    )
+
+    root.destroy()
+
+    if file_path:
+        return Path(file_path)
+    return None
+
+
+def interactive_menu() -> int:
+    """대화형 메뉴 모드"""
+    print("=" * 50)
+    print("    TXT 파일 회차별 분할 도구")
+    print("=" * 50)
+    print()
+
+    # 1. 파일 선택
+    print("[1단계] 파일 선택")
+    print("파일 선택 창이 열립니다...")
+    input_file = select_file()
+
+    if not input_file:
+        print("파일을 선택하지 않았습니다.")
+        return 1
+
+    print(f"선택된 파일: {input_file}")
+    print()
+
+    # 2. 패턴 선택
+    print("[2단계] 회차 구분 형식 선택")
+    print("-" * 40)
+    preset_keys = list(PRESETS.keys())
+    for i, key in enumerate(preset_keys, 1):
+        print(f"  {i}. {PRESET_DESCRIPTIONS[key]}")
+    print(f"  {len(preset_keys) + 1}. 직접 입력 (정규식)")
+    print("-" * 40)
+
+    while True:
+        try:
+            choice = input(f"선택 (1-{len(preset_keys) + 1}) [기본값: 1]: ").strip()
+            if choice == "":
+                choice = 1
+            else:
+                choice = int(choice)
+
+            if 1 <= choice <= len(preset_keys):
+                pattern = PRESETS[preset_keys[choice - 1]]
+                break
+            elif choice == len(preset_keys) + 1:
+                pattern = input("정규식 패턴 입력: ").strip()
+                if not pattern:
+                    print("패턴을 입력해주세요.")
+                    continue
+                break
+            else:
+                print("올바른 번호를 선택해주세요.")
+        except ValueError:
+            print("숫자를 입력해주세요.")
+
+    print(f"선택된 패턴: {pattern}")
+    print()
+
+    # 3. 그룹 크기 선택
+    print("[3단계] 몇 회차씩 묶을지 선택")
+    print("-" * 40)
+    print("  1. 5회차씩")
+    print("  2. 10회차씩")
+    print("  3. 20회차씩")
+    print("  4. 30회차씩")
+    print("  5. 50회차씩")
+    print("  6. 100회차씩")
+    print("  7. 직접 입력")
+    print("-" * 40)
+
+    group_options = [5, 10, 20, 30, 50, 100]
+
+    while True:
+        try:
+            choice = input("선택 (1-7) [기본값: 1]: ").strip()
+            if choice == "":
+                group_size = 5
+                break
+            else:
+                choice = int(choice)
+
+            if 1 <= choice <= 6:
+                group_size = group_options[choice - 1]
+                break
+            elif choice == 7:
+                group_size = int(input("회차 수 입력: ").strip())
+                if group_size < 1:
+                    print("1 이상의 숫자를 입력해주세요.")
+                    continue
+                break
+            else:
+                print("올바른 번호를 선택해주세요.")
+        except ValueError:
+            print("숫자를 입력해주세요.")
+
+    print(f"선택된 그룹 크기: {group_size}회차씩")
+    print()
+
+    # 실행
+    print("=" * 50)
+    print("분할 시작...")
+    print("=" * 50)
+
+    # 파일 읽기
+    print(f"파일 읽는 중: {input_file}")
+    text = input_file.read_text(encoding="utf-8")
+
+    # 회차별 파싱
+    print(f"패턴으로 분할 중: {pattern}")
+    chapters = parse_chapters(text, pattern)
+
+    if not chapters:
+        input("\n엔터를 누르면 종료합니다...")
+        return 1
+
+    print(f"총 {len(chapters)}개 회차 발견")
+
+    # 그룹화
+    groups = group_chapters(chapters, group_size)
+    print(f"{group_size}개씩 {len(groups)}개 그룹으로 분할")
+
+    # 저장
+    output_dir = input_file.parent
+    base_name = input_file.stem
+    saved_files = save_groups(groups, base_name, output_dir)
+
+    print()
+    print("=" * 50)
+    print(f"완료! {len(saved_files)}개 파일 생성됨")
+    print(f"저장 위치: {output_dir}")
+    print("=" * 50)
+
+    input("\n엔터를 누르면 종료합니다...")
+    return 0
+
+
+def cli_mode() -> int:
+    """CLI 모드"""
     parser = argparse.ArgumentParser(
         description="TXT 파일을 회차별로 분할합니다.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -139,6 +301,7 @@ def main():
   part         Part N 형식
 
 예시:
+  python split_chapters.py                              # 대화형 메뉴
   python split_chapters.py novel.txt
   python split_chapters.py novel.txt --group-size 10
   python split_chapters.py novel.txt --preset korean_hanja
@@ -213,6 +376,14 @@ def main():
 
     print(f"\n완료! {len(saved_files)}개 파일 생성됨")
     return 0
+
+
+def main():
+    # 인자 없이 실행하면 대화형 메뉴
+    if len(sys.argv) == 1:
+        return interactive_menu()
+    else:
+        return cli_mode()
 
 
 if __name__ == "__main__":
