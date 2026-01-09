@@ -2,7 +2,11 @@
 
 TXT 파일을 회차(장)별로 분할하는 Python 스크립트
 
-## 설치
+## 다운로드
+
+**Windows exe**: [dist/split_chapters.exe](dist/split_chapters.exe) - 더블클릭으로 바로 실행
+
+## 설치 (Python)
 
 ```bash
 git clone https://github.com/route99-roadRunner/split-chapters.git
@@ -12,6 +16,19 @@ cd split-chapters
 Python 3.10+ 필요 (외부 의존성 없음)
 
 ## 사용법
+
+### 대화형 메뉴 (권장)
+
+exe 파일을 더블클릭하거나 인자 없이 실행:
+```bash
+python split_chapters.py
+```
+
+1. **파일 선택** - 파일 선택 창에서 TXT 파일 선택
+2. **회차 형식 선택** - 6가지 프리셋 또는 직접 정규식 입력
+3. **그룹 크기 선택** - 5/10/20/30/50/100회차 또는 직접 입력
+
+### CLI 모드
 
 ```bash
 # 기본 사용 (5회차씩, # 제N장 패턴)
